@@ -1,3 +1,5 @@
+import { Redis } from "@upstash/redis";
+
 export const addFailedSymbols = async (dataKey, symbols) => {
   const redis = new Redis({
     url: process.env.KV_REST_API_URL,
