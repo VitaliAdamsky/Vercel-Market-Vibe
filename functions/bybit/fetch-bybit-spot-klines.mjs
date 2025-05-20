@@ -40,13 +40,12 @@ export const fetchBybitSpotKlines = async (coins, timeframe, limit) => {
         });
       }
 
-      const cleanedData = data.slice(0, -1);
       return {
         symbol: coin.symbol,
         category: coin.category || "unknown",
         exchanges: coin.exchanges || [],
         imageUrl: coin.imageUrl || "assets/img/noname.png",
-        data: cleanedData,
+        data: data.slice(1, -1),
       };
     } catch (error) {
       console.error(`Error processing ${coin.symbol}:`, error);

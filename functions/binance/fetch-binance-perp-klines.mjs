@@ -59,19 +59,22 @@ export const fetchBinancePerpKlines = async (coins, timeframe, limit) => {
           return {
             openTime: parseFloat(entry[0]),
             closeTime: parseFloat(entry[6]),
+            openPrice: parseFloat(entry[1]),
+            highPrice: parseFloat(entry[2]),
+            lowPrice: parseFloat(entry[3]),
             closePrice: parseFloat(entry[4]),
             quoteVolume: parseFloat(totalQuoteVolume),
             buyerRatio: parseFloat(buyerRatio),
             volumeDelta: parseFloat(volumeDelta),
           };
         });
-      const cleanedData = data.slice(1, -1);
+
       return {
         symbol: coin.symbol,
         exchanges: coin.exchanges,
         imageUrl: coin.imageUrl,
         category: coin.category,
-        data: cleanedData,
+        data: data.slice(1, -1),
       };
     } catch (error) {
       console.error(`Error processing ${coin.symbol}:`, error);

@@ -1,11 +1,14 @@
 // api/fetch-klines.mjs
-import { validateRequestParams } from "../../functions/utility/validate-request-params.mjs";
+import { validateRequestParams } from "../../functions/utility/validators/validate-request-params.mjs";
 
 import { fetchBinanceFr } from "../../functions/binance/fetch-binance-fr.mjs";
 import { fetchBybitFr } from "../../functions/bybit/fetch-bybit-fr.mjs";
 import { normalizeFundingRateData } from "../../functions/normalize/normalize-funding-rate-data.mjs";
 import { calculateExpirationTime } from "../../functions/utility/calculate-expiration-time.mjs";
-import { fetchBinanceDominantCoinsFromRedis } from "../../functions/coins/fetch-binance-dominant-coins-from-redis.mjs";
+import { fetchDominantCoinsFromRedis } from "../../functions/coins/fetch-dominant-coins-from-redis.mjs";
+import { exchanges } from "../../functions/coins/exchanges.mjs";
+import { dataKeys } from "../../functions/utility/redis/data-keys.mjs";
+import { handleFetchWithFailureTracking } from "../../functions/utility/handle-fetch-with-failure-tracking.mjs";
 
 export const config = {
   runtime: "edge",
@@ -22,14 +25,24 @@ export default async function handler(request) {
       return params;
     }
 
-    const { limit } = params;
+    const { coinType, dominant, limit } = params;
 
     const { binancePerpCoins, bybitPerpCoins } =
-      await fetchBinanceDominantCoinsFromRedis();
+      await fetchDominantCoinsFromRedis(coinType, dominant);
 
     const [bybitFr, binanceFr] = await Promise.all([
-      fetchBybitFr(bybitPerpCoins, limit),
-      fetchBinanceFr(binancePerpCoins, limit),
+      handleFetchWithFailureTracking(
+        fetchBybitFr,
+        bybitPerpCoins,
+        limit,
+        dataKeys.failedBybitPerpSymbols
+      ),
+      handleFetchWithFailureTracking(
+        fetchBinanceFr,
+        binancePerpCoins,
+        limit,
+        dataKeys.failedBinancePerpSymbols
+      ),
     ]);
 
     const expirationTime = calculateExpirationTime(

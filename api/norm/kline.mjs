@@ -1,67 +1,85 @@
-// api/fetch-klines.mjs
-
 import { fetchBinancePerpKlines } from "../../functions/binance/fetch-binance-perp-klines.mjs";
-import { fetchBinanceSpotKlines } from "../../functions/binance/fetch-binance-spot-klines.mjs";
 import { fetchBybitPerpKlines } from "../../functions/bybit/fetch-bybit-perp-klines.mjs";
-import { fetchBybitSpotKlines } from "../../functions/bybit/fetch-bybit-spot-klines.mjs";
 
-import { mergeSpotWithPerps } from "../../functions/utility/merges/merge-spot-with-perps.mjs";
-import { validateRequestParams } from "../../functions/utility/validate-request-params.mjs";
 import { normalizeKlineData } from "../../functions/normalize/normalize-kline-data.mjs";
-import { calculateExpirationTime } from "../../functions/utility/calculate-expiration-time.mjs";
-import { fetchBinanceDominantCoinsFromRedis } from "../../functions/coins/fetch-binance-dominant-coins-from-redis.mjs";
+import { calculateExpirationTime } from "../../functions/utility/calculations/calculate-expiration-time.mjs";
+import { validateRequestParams } from "../../functions/utility/validators/validate-request-params.mjs";
+import { fetchDominantCoinsFromRedis } from "../../functions/coins/fetch-dominant-coins-from-redis.mjs";
+
+import { dataKeys } from "../../functions/utility/redis/data-keys.mjs";
+import { handleFetchWithFailureTracking } from "../../functions/utility/handle-fetch-with-failure-tracking.mjs";
+import { calculatePerpChanges } from "../../functions/utility/calculations/calculate-perp-changes.mjs";
 
 export const config = {
   runtime: "edge",
-  regions: ["lhr1"],
+  regions: ["cdg1"],
 };
 
 export default async function handler(request) {
   try {
-    // 1. Валидация параметров
     const params = validateRequestParams(request.url);
 
-    // 2. Если ошибка — возвращаем её
     if (params instanceof Response) {
       return params;
     }
 
-    const { timeframe, limit } = params;
+    const { timeframe, dominant, limit, coinType } = params;
+    console.log("params", params);
 
-    const {
-      binancePerpCoins,
-      binanceSpotCoins,
-      bybitPerpCoins,
-      bybitSpotCoins,
-    } = await fetchBinanceDominantCoinsFromRedis();
+    const { binancePerpCoins, bybitPerpCoins } =
+      await fetchDominantCoinsFromRedis(coinType, dominant);
 
-    // 3. Fetch all data in parallel
-    const [binancePerps, binanceSpot, bybitPerps, bybitSpot] =
-      await Promise.all([
-        fetchBinancePerpKlines(binancePerpCoins, timeframe, limit),
-        fetchBinanceSpotKlines(binanceSpotCoins, timeframe, limit),
-        fetchBybitPerpKlines(bybitPerpCoins, timeframe, limit),
-        fetchBybitSpotKlines(bybitSpotCoins, timeframe, limit),
-      ]);
+    console.log(dataKeys);
+    const [binancePerps, bybitPerps] = await Promise.all([
+      handleFetchWithFailureTracking(
+        fetchBinancePerpKlines,
+        binancePerpCoins,
+        timeframe,
+        limit,
+        dataKeys.failedBinancePerpSymbols
+      ),
+      handleFetchWithFailureTracking(
+        fetchBybitPerpKlines,
+        bybitPerpCoins,
+        timeframe,
+        limit,
+        dataKeys.failedBybitPerpSymbols
+      ),
+    ]);
+
+    console.log("Binance Perps", binancePerps.length);
+    console.log("Bybit Perps", bybitPerps.length);
 
     const expirationTime = calculateExpirationTime(
-      binancePerps[0]?.data.at(-1).openTime,
+      binancePerps?.[0]?.data?.[binancePerps[0].data.length - 1]?.openTime,
       timeframe
     );
 
-    let data = mergeSpotWithPerps(
-      [...binancePerps, ...bybitPerps],
-      [...binanceSpot, ...bybitSpot]
+    console.log(
+      "OpenTime",
+      binancePerps?.[0]?.data?.[binancePerps[0].data.length - 1]?.openTime
     );
-    data = normalizeKlineData(data);
+    console.log("Expiration time", expirationTime);
 
-    return new Response(JSON.stringify({ timeframe, expirationTime, data }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "max-age=60",
-      },
-    });
+    let data = calculatePerpChanges([...binancePerps, ...bybitPerps]);
+
+    console.log("Merged data", data.length);
+    //data = normalizeKlineData(data);
+
+    return new Response(
+      JSON.stringify({
+        timeframe,
+        expirationTime,
+        data,
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "max-age=60",
+        },
+      }
+    );
   } catch (error) {
     return new Response(
       JSON.stringify({

@@ -1,10 +1,17 @@
-import { calcChange } from "../calculate-change.mjs";
+import { calcChange } from "../colors/calculations/calculate-change.mjs";
 
 export function mergeSpotWithPerps(perps, spot) {
-  // 1. Создаём карту спотовых данных по символу и openTime
-  const spotMap = new Map();
+  if (!Array.isArray(perps)) {
+    throw new Error("Expected 'perps' to be an array");
+  }
+  if (!Array.isArray(spot)) {
+    throw new Error("Expected 'spot' to be an array");
+  }
 
+  // Build spotMap[symbol][openTime] = closePrice
+  const spotMap = new Map();
   for (const { symbol, data } of spot) {
+    if (!Array.isArray(data)) continue;
     const timeMap = new Map();
     for (const entry of data) {
       timeMap.set(entry.openTime, entry.closePrice);
@@ -12,61 +19,42 @@ export function mergeSpotWithPerps(perps, spot) {
     spotMap.set(symbol, timeMap);
   }
 
-  // 2. Обрабатываем PERP-данные, сохраняя все поля (exchanges, imageUrl, category)
+  // Process perps
   return perps.map((perp) => {
-    const { symbol, data, ...rest } = perp; // Сохраняем все поля, кроме symbol и data
-    const spotData = spotMap.get(symbol) || new Map();
-    let prevEntry = null;
+    const { symbol, data, ...meta } = perp;
+    if (!Array.isArray(data)) return { symbol, ...meta, data: [] };
 
-    // Обрабатываем каждую запись PERP
-    const processedData = data.map((currentEntry) => {
-      // Вычисляем изменения между текущей и предыдущей записью
+    const spotData = spotMap.get(symbol);
+    let prev = null;
+
+    const processed = data.map((entry) => {
+      const spotClosePrice = spotData?.get(entry.openTime) ?? null;
+      const perpSpotDiff =
+        spotClosePrice !== null
+          ? calcChange(entry.closePrice, spotClosePrice)
+          : null;
+
       const changes = {
-        quoteVolumeChange: calcChange(
-          currentEntry.quoteVolume,
-          prevEntry?.quoteVolume
-        ),
-        volumeDeltaChange: calcChange(
-          currentEntry.volumeDelta,
-          prevEntry?.volumeDelta
-        ),
-        closePriceChange: calcChange(
-          currentEntry.closePrice,
-          prevEntry?.closePrice
-        ),
-        buyerRatioChange: calcChange(
-          currentEntry.buyerRatio,
-          prevEntry?.buyerRatio
-        ),
+        quoteVolumeChange: calcChange(entry.quoteVolume, prev?.quoteVolume),
+        volumeDeltaChange: calcChange(entry.volumeDelta, prev?.volumeDelta),
+        closePriceChange: calcChange(entry.closePrice, prev?.closePrice),
+        buyerRatioChange: calcChange(entry.buyerRatio, prev?.buyerRatio),
       };
 
-      // Получаем спотовую цену, если доступна
-      const spotPrice = spotData.get(currentEntry.openTime);
-      const spotMetrics = spotPrice
-        ? {
-            spotClosePrice: spotPrice,
-            perpSpotDiff: calcChange(currentEntry.closePrice, spotPrice),
-          }
-        : {};
+      prev = entry;
 
-      prevEntry = currentEntry;
-
-      // Возвращаем объединённые данные
       return {
-        ...currentEntry,
+        ...entry,
         ...changes,
-        ...spotMetrics,
+        spotClosePrice,
+        perpSpotDiff,
       };
     });
 
-    // Удаляем первый элемент из массива (где изменения = null)
-    const finalData = processedData.slice(1);
-
-    // Возвращаем объект с обработанными данными
     return {
       symbol,
-      ...rest,
-      data: finalData,
+      ...meta,
+      data: processed.slice(1),
     };
   });
 }

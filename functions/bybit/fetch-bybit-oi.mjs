@@ -12,63 +12,62 @@ export const fetchBybitOi = async (coins, timeframe, limit) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`Error fetching ${coin.symbol}:`, errorText);
-        throw new Error(`HTTP error! status: ${response.status}`);
+        return { success: false, symbol: coin.symbol };
       }
 
-      const responseData = await response.json();
-
-      if (
-        !responseData?.result?.list ||
-        !Array.isArray(responseData.result.list)
-      ) {
-        console.error(`Invalid response for ${coin.symbol}:`, responseData);
-        throw new Error(`Invalid response for ${coin.symbol}`);
+      const json = await response.json();
+      const list = json?.result?.list;
+      if (!Array.isArray(list)) {
+        console.error(`Invalid response for ${coin.symbol}:`, json);
+        return { success: false, symbol: coin.symbol };
       }
 
-      const rawEntries = responseData.result.list;
-      const data = rawEntries
+      // sort + map
+      const mapped = list
         .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
-        .map((entry, index, arr) => {
-          const currentValue = Number(entry.openInterest);
+        .map((entry, idx, arr) => {
+          const curr = Number(entry.openInterest);
+          let change = null;
 
-          let openInterestChange = null;
-          if (index > 0) {
-            const prevValue = Number(arr[index - 1].openInterest);
-            if (prevValue !== 0) {
-              openInterestChange = Number(
-                (
-                  ((currentValue - prevValue) / Math.abs(prevValue)) *
-                  100
-                ).toFixed(2)
-              );
-            } else {
-              openInterestChange = currentValue !== 0 ? 100 : 0;
-            }
+          if (idx > 0) {
+            const prev = Number(arr[idx - 1].openInterest);
+            change =
+              prev !== 0
+                ? Number((((curr - prev) / Math.abs(prev)) * 100).toFixed(2))
+                : curr !== 0
+                ? 100
+                : 0;
           }
 
           return {
             symbol: coin.symbol,
             openTime: Number(entry.timestamp),
-            openInterest: Number(currentValue.toFixed(2)),
-            openInterestChange,
+            openInterest: Number(curr.toFixed(2)),
+            openInterestChange: change,
           };
         });
 
-      // Удаляем только первый элемент (где openInterestChange = null)
-      const cleanedData = data.slice(1, -1);
+      // drop first & last if desired
+      const cleaned = mapped.slice(1, -1);
 
       return {
         symbol: coin.symbol,
         exchanges: coin.exchanges || [],
         imageUrl: coin.imageUrl || "",
         category: coin.category || "",
-        data: cleanedData,
+        data: cleaned,
       };
-    } catch (error) {
-      console.error(`Error processing ${coin.symbol}:`, error);
-      return { symbol: coin.symbol, data: [] };
+    } catch (err) {
+      console.error(`Error processing ${coin.symbol}:`, err);
+      return { success: false, symbol: coin.symbol };
     }
   });
 
   return Promise.all(promises);
 };
+
+/**
+ * Partition an array of { success, data?, symbol? } into
+ *   - successes: the full payloads
+ *   - failedSymbols: just the symbols that failed
+ */

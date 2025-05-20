@@ -1,7 +1,7 @@
 import { getIntervalDurationMs } from "../utility/get-interval-duration-ms.mjs";
 import { getBybitKlineInterval } from "./get-bybit-kline-interval.mjs";
 import { bybitPerpUrl } from "./bybit-perps-url.mjs";
-import { calculateCloseTime } from "../utility/calculate-close-time.mjs";
+import { calculateCloseTime } from "../utility/calculations/calculate-close-time.mjs";
 
 export const fetchBybitPerpKlines = async (coins, timeframe, limit) => {
   const intervalMs = getIntervalDurationMs(timeframe);
@@ -37,6 +37,9 @@ export const fetchBybitPerpKlines = async (coins, timeframe, limit) => {
         data.push({
           openTime: Number(entry[0]),
           closeTime: calculateCloseTime(Number(entry[0]), intervalMs),
+          openPrice: Number(entry[1]),
+          highPrice: Number(entry[2]),
+          lowPrice: Number(entry[3]),
           closePrice: Number(entry[4]),
           quoteVolume: Number(entry[6]),
         });
@@ -48,7 +51,7 @@ export const fetchBybitPerpKlines = async (coins, timeframe, limit) => {
         category: coin.category || "unknown",
         exchanges: coin.exchanges || [],
         imageUrl: coin.imageUrl || "assets/img/noname.png",
-        data: cleanedData,
+        data: data.slice(1, -1),
       };
     } catch (error) {
       console.error(`Error processing ${coin.symbol}:`, error);

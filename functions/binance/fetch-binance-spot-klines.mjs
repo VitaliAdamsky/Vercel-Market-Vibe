@@ -43,13 +43,12 @@ export const fetchBinanceSpotKlines = async (coins, timeframe, limit) => {
           closePrice: parseFloat(entry[4]),
         }));
 
-      const cleanedData = data.slice(1, -1);
       return {
         symbol: coin.symbol,
         exchanges: coin.exchanges,
         imageUrl: coin.imageUrl,
         category: coin.category,
-        data: cleanedData,
+        data: data.slice(1, -1),
       };
     } catch (error) {
       console.error(`Error processing ${coin.symbol}:`, error);

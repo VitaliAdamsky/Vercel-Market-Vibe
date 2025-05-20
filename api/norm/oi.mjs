@@ -1,12 +1,14 @@
 // api/fetch-klines.mjs
-import { validateRequestParams } from "../../functions/utility/validate-request-params.mjs";
+import { validateRequestParams } from "../../functions/utility/validators/validate-request-params.mjs";
 import { fetchBinanceOi } from "../../functions/binance/fetch-binance-oi.mjs";
 import { fetchBybitOi } from "../../functions/bybit/fetch-bybit-oi.mjs";
+import { dataKeys } from "../../functions/utility/redis/data-keys.mjs";
 
 import { normalizeOpenInterestData } from "../../functions/normalize/normalize-open-interest-data.mjs";
 
-import { calculateExpirationTime } from "../../functions/utility/calculate-expiration-time.mjs";
-import { fetchBinanceDominantCoinsFromRedis } from "../../functions/coins/fetch-binance-dominant-coins-from-redis.mjs";
+import { calculateExpirationTime } from "../../functions/utility/colors/calculations/calculate-expiration-time.mjs";
+import { fetchDominantCoinsFromRedis } from "../../functions/coins/fetch-dominant-coins-from-redis.mjs";
+import { handleFetchWithFailureTracking } from "../../functions/utility/handle-fetch-with-failure-tracking.mjs";
 
 export const config = {
   runtime: "edge",
@@ -23,10 +25,27 @@ export default async function handler(request) {
       return params;
     }
 
-    const { timeframe, limit } = params;
+    const { timeframe, limit, coinType, dominant } = params;
 
     const { binancePerpCoins, bybitPerpCoins } =
-      await fetchBinanceDominantCoinsFromRedis();
+      await fetchDominantCoinsFromRedis(coinType, dominant);
+
+    // const [binanceOi, bybitOi] = await Promise.all([
+    //   handleFetchWithFailureTracking(
+    //     fetchBinanceOi,
+    //     binancePerpCoins,
+    //     timeframe,
+    //     limit,
+    //     dataKeys.failedBinancePerpSymbols
+    //   ),
+    //   handleFetchWithFailureTracking(
+    //     fetchBybitOi,
+    //     bybitPerpCoins,
+    //     timeframe,
+    //     limit,
+    //     dataKeys.failedBybitPerpSymbols
+    //   ),
+    // ]);
 
     const [binanceOi, bybitOi] = await Promise.all([
       fetchBinanceOi(binancePerpCoins, timeframe, limit),

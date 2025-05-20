@@ -1,19 +1,14 @@
+import { dataKeys } from "../../functions/utility/redis/data-keys.mjs";
+import { setDataInRedis } from "../../functions/utility/redis/set-data-in-redis.mjs";
 import { fetchCoinsFromDb } from "../../functions/coins/fetch-coins-from-db.mjs";
-import { Redis } from "@upstash/redis";
+import { getDataFromRedis } from "../../functions/utility/redis/get-data-from-redis.mjs";
 
 export const config = {
   runtime: "edge",
   regions: ["fra1"],
 };
 
-// THIS SCRIPT BRINS DATA FROM MONGODB AND STORES IT IN REDIS
-// THE DATA IS THEN RETURNED TO THE CLIENT
 export default async function handler(request) {
-  const redis = new Redis({
-    url: process.env.KV_REST_API_URL,
-    token: process.env.KV_REST_API_TOKEN,
-  });
-
   try {
     const coins = await fetchCoinsFromDb();
 
@@ -24,17 +19,11 @@ export default async function handler(request) {
       );
     }
 
-    const key = "coins";
-    await redis.set(key, JSON.stringify(coins));
+    await setDataInRedis(dataKeys.coins, coins);
 
-    // Retrieve the stored value
-    const storedData = await redis.get(key);
+    const storedData = await getDataFromRedis(dataKeys.coins);
 
-    // If it's a string, parse it; otherwise, return as is
-    const parsedData =
-      typeof storedData === "string" ? JSON.parse(storedData) : storedData;
-
-    return new Response(JSON.stringify({ coins: parsedData }), {
+    return new Response(JSON.stringify({ coins: storedData }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

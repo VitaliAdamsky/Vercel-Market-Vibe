@@ -1,4 +1,4 @@
-import { getIntervalDurationMs } from "./get-interval-duration-ms.mjs";
+import { getIntervalDurationMs } from "../get-interval-duration-ms.mjs";
 
 export function calculateExpirationTime(openTime, timeframe) {
   if (typeof openTime !== "number" && typeof openTime !== "string") {
