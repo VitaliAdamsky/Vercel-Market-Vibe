@@ -4,7 +4,7 @@ import { validateRequestParams } from "../../functions/utility/validators/valida
 import { fetchBinanceFr } from "../../functions/binance/fetch-binance-fr.mjs";
 import { fetchBybitFr } from "../../functions/bybit/fetch-bybit-fr.mjs";
 import { normalizeFundingRateData } from "../../functions/normalize/normalize-funding-rate-data.mjs";
-import { calculateExpirationTime } from "../../functions/utility/calculate-expiration-time.mjs";
+import { calculateExpirationTime } from "../../functions/utility/calculations/calculate-expiration-time.mjs";
 import { fetchDominantCoinsFromRedis } from "../../functions/coins/fetch-dominant-coins-from-redis.mjs";
 import { exchanges } from "../../functions/coins/exchanges.mjs";
 import { dataKeys } from "../../functions/utility/redis/data-keys.mjs";

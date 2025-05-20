@@ -2,11 +2,10 @@
 import { validateRequestParams } from "../../functions/utility/validators/validate-request-params.mjs";
 import { fetchBinanceOi } from "../../functions/binance/fetch-binance-oi.mjs";
 import { fetchBybitOi } from "../../functions/bybit/fetch-bybit-oi.mjs";
-import { dataKeys } from "../../functions/utility/redis/data-keys.mjs";
 
 import { normalizeOpenInterestData } from "../../functions/normalize/normalize-open-interest-data.mjs";
 
-import { calculateExpirationTime } from "../../functions/utility/colors/calculations/calculate-expiration-time.mjs";
+import { calculateExpirationTime } from "../../functions/utility/calculations/calculate-expiration-time.mjs";
 import { fetchDominantCoinsFromRedis } from "../../functions/coins/fetch-dominant-coins-from-redis.mjs";
 import { handleFetchWithFailureTracking } from "../../functions/utility/handle-fetch-with-failure-tracking.mjs";
 
